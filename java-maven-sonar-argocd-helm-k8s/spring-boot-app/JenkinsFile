@@ -58,12 +58,7 @@ pipeline {
     }
 
     stage('Update Deployment File') {
-      agent {
-        node {
-          label 'built-in'
-          customWorkspace '/var/lib/jenkins/tmp/update-deployment'
-        }
-      }
+      agent any  // ✅ fixes “process never started” issue by avoiding @tmp workspaces
 
       environment {
         GIT_REPO_NAME = "Jenkins-Zero-To-Hero"
@@ -75,7 +70,9 @@ pipeline {
           script {
             echo "🚀 Updating deployment manifest with new Docker image tag..."
 
-            sh '''#!/bin/bash
+            // ✅ uses real bash shell and safe workspace
+            sh label: 'Update Deployment Manifest', returnStatus: false, script: '''
+              #!/usr/bin/bash
               set -euxo pipefail
 
               echo "🧭 Current workspace: $(pwd)"
@@ -103,7 +100,7 @@ pipeline {
         }
       }
     }
-  } // ✅ closes stages
+  }
 
   post {
     always {
@@ -117,4 +114,4 @@ pipeline {
       echo "❌ Pipeline failed. Check Jenkins console logs."
     }
   }
-} // ✅ closes pipeline
+}
