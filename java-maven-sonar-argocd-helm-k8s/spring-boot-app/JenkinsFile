@@ -28,7 +28,12 @@ pipeline {
       }
       steps {
         withCredentials([string(credentialsId: 'sonarqube', variable: 'SONAR_AUTH_TOKEN')]) {
-          sh 'cd java-maven-sonar-argocd-helm-k8s/spring-boot-app && mvn sonar:sonar -Dsonar.login=$SONAR_AUTH_TOKEN -Dsonar.host.url=${SONAR_URL}'
+          sh '''
+            cd java-maven-sonar-argocd-helm-k8s/spring-boot-app
+            mvn sonar:sonar \
+              -Dsonar.login=$SONAR_AUTH_TOKEN \
+              -Dsonar.host.url=${SONAR_URL}
+          '''
         }
       }
     }
@@ -40,53 +45,51 @@ pipeline {
       }
       steps {
         script {
-          sh 'cd java-maven-sonar-argocd-helm-k8s/spring-boot-app && docker build -t ${DOCKER_IMAGE} .'
+          sh '''
+            cd java-maven-sonar-argocd-helm-k8s/spring-boot-app
+            docker build -t ${DOCKER_IMAGE} .
+          '''
           def dockerImage = docker.image("${DOCKER_IMAGE}")
           docker.withRegistry('https://index.docker.io/v1/', "docker-cred") {
-              dockerImage.push()
+            dockerImage.push()
           }
         }
       }
     }
 
-stage('Update Deployment File') {
-  agent any   // ✅ Run this stage on Jenkins host (not Docker)
-  environment {
-      GIT_REPO_NAME = "Jenkins-Zero-To-Hero"
-      GIT_USER_NAME = "RajeshGoruvaa"
-  }
-  steps {
-      withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
-          sh '''
-              echo "🚀 Updating deployment manifest with new Docker image tag..."
-
-              # Move into the correct directory (the repo workspace)
-              cd java-maven-sonar-argocd-helm-k8s
-
-              # Configure Git identity
-              git config user.email "stark.devops@example.com"
-              git config user.name "Rajesh Goruvaa"
-
-              # Replace the placeholder tag in deployment.yml with the Jenkins build number
-              BUILD_NUMBER=${BUILD_NUMBER}
-              sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" spring-boot-app-manifests/deployment.yml
-
-              # Verify change
-              echo "Updated deployment file:"
-              cat spring-boot-app-manifests/deployment.yml | grep image
-
-              # Commit and push changes
-              git add spring-boot-app-manifests/deployment.yml
-              git commit -m "Update deployment image to version ${BUILD_NUMBER}" || echo "No changes to commit"
-              git pull --rebase origin main
-              git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git HEAD:main
-
-              echo "✅ deployment.yml updated and pushed successfully."
-          '''
+    // ✅ Updated manifest handling stage
+    stage('Update Deployment File') {
+      agent any   // run this stage directly on Jenkins host
+      environment {
+        GIT_REPO_NAME = "Jenkins-Zero-To-Hero"
+        GIT_USER_NAME = "RajeshGoruvaa"
       }
-  }
-}
+      steps {
+        withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
+          sh '''
+            echo "🚀 Updating deployment manifest with new Docker image tag..."
 
+            cd java-maven-sonar-argocd-helm-k8s
+            git config user.email "stark.devops@example.com"
+            git config user.name "Rajesh Goruvaa"
+
+            BUILD_NUMBER=${BUILD_NUMBER}
+            sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" spring-boot-app-manifests/deployment.yml
+
+            echo "🧾 deployment.yml after update:"
+            grep image spring-boot-app-manifests/deployment.yml || true
+
+            git add spring-boot-app-manifests/deployment.yml
+            git commit -m "Update deployment image to version ${BUILD_NUMBER}" || echo "No changes to commit"
+            git pull --rebase origin main
+            git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git HEAD:main
+
+            echo "✅ Manifest updated and pushed successfully."
+          '''
+        }
+      }
+    }
+  } // <-- closes 'stages'
 
   post {
     always {
@@ -100,4 +103,4 @@ stage('Update Deployment File') {
       echo "❌ Pipeline failed. Check Jenkins console logs."
     }
   }
-}
+} // <-- closes 'pipeline'
