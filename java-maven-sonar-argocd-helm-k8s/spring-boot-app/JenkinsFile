@@ -6,7 +6,7 @@ pipeline {
     }
   }
 
-  stages {   // 👈 single stages block wrapping ALL stage blocks
+  stages {
 
     stage('Checkout') {
       steps {
@@ -49,28 +49,35 @@ pipeline {
       }
     }
 
-   stage('Update Deployment File') {
-    environment {
+    stage('Update Deployment File') {
+      environment {
         GIT_REPO_NAME = "Jenkins-Zero-To-Hero"
         GIT_USER_NAME = "RajeshGoruvaa"
-    }
-    steps {
+      }
+      steps {
         withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
-            sh '''
-                cd java-maven-sonar-argocd-helm-k8s   # ✅ Move into the repo workspace
-                git config user.email "rajeshgoruvaa@gmail.com"
-                git config user.name "Rajesh Goruvaa"
+          sh '''
+            cd java-maven-sonar-argocd-helm-k8s
 
-                BUILD_NUMBER=${BUILD_NUMBER}
+            # Set up Git identity
+            git config user.email "stark.devops@example.com"
+            git config user.name "Rajesh Goruvaa"
 
-                sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" spring-boot-app-manifests/deployment.yml
-                git add spring-boot-app-manifests/deployment.yml
-                git commit -m "Update deployment image to version ${BUILD_NUMBER}" || echo "No changes to commit"
-                git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git HEAD:main
-            '''
+            BUILD_NUMBER=${BUILD_NUMBER}
+
+            # Update image tag in deployment manifest
+            sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" spring-boot-app-manifests/deployment.yml
+
+            # Commit and push changes
+            git add spring-boot-app-manifests/deployment.yml
+            git commit -m "Update deployment image to version ${BUILD_NUMBER}" || echo "No changes to commit"
+            git pull --rebase origin main
+            git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git HEAD:main
+          '''
         }
+      }
     }
-}
+  }
 
   post {
     always {
