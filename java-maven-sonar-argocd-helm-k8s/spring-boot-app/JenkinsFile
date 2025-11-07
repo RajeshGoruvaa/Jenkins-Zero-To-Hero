@@ -57,53 +57,52 @@ pipeline {
       }
     }
 
-    stage('Update Deployment File') {
-      agent {
-        node {
-          label 'built-in'
-          customWorkspace '/tmp/update-deployment'
-        }
-      }
+stage('Update Deployment File') {
+  agent {
+    node {
+      label 'built-in'
+      customWorkspace '/var/lib/jenkins/tmp/update-deployment'
+    }
+  }
 
-      environment {
-        GIT_REPO_NAME = "Jenkins-Zero-To-Hero"
-        GIT_USER_NAME = "RajeshGoruvaa"
-      }
+  environment {
+    GIT_REPO_NAME = "Jenkins-Zero-To-Hero"
+    GIT_USER_NAME = "RajeshGoruvaa"
+  }
 
-      steps {
-        withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
-          script {
-            echo "🚀 Updating deployment manifest with new Docker image tag..."
+  steps {
+    withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
+      script {
+        echo "🚀 Updating deployment manifest with new Docker image tag..."
 
-            sh '''#!/bin/bash
-              set -euxo pipefail
+        sh '''#!/bin/bash
+          set -euxo pipefail
 
-              echo "🧭 Current workspace: $(pwd)"
-              ls -ltr
+          echo "🧭 Current workspace: $(pwd)"
+          ls -ltr
 
-              git clone https://github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git
-              cd ${GIT_REPO_NAME}/java-maven-sonar-argocd-helm-k8s
+          git clone https://github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git
+          cd ${GIT_REPO_NAME}/java-maven-sonar-argocd-helm-k8s
 
-              git config user.email "stark.devops@example.com"
-              git config user.name "Rajesh Goruvaa"
+          git config user.email "stark.devops@example.com"
+          git config user.name "Rajesh Goruvaa"
 
-              echo "🔄 Updating deployment image tag..."
-              sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" spring-boot-app-manifests/deployment.yml
+          echo "🔄 Updating deployment image tag..."
+          sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" spring-boot-app-manifests/deployment.yml
 
-              echo "🧾 Updated deployment file image:"
-              grep image spring-boot-app-manifests/deployment.yml || true
+          echo "🧾 Updated deployment file image:"
+          grep image spring-boot-app-manifests/deployment.yml || true
 
-              git add spring-boot-app-manifests/deployment.yml
-              git commit -m "Update deployment image to version ${BUILD_NUMBER}" || echo "No changes to commit"
+          git add spring-boot-app-manifests/deployment.yml
+          git commit -m "Update deployment image to version ${BUILD_NUMBER}" || echo "No changes to commit"
 
-              git pull --rebase origin main
-              git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git HEAD:main
-            '''
-          }
-        }
+          git pull --rebase origin main
+          git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git HEAD:main
+        '''
       }
     }
-  } // 👈 closes stages
+  }
+}
 
   post {
     always {
