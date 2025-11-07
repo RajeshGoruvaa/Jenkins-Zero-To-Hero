@@ -8,6 +8,17 @@ pipeline {
 
   stages {
 
+    stage('Verify Environment') {
+      steps {
+        sh '''
+          echo "🧠 Current Jenkins temp dir: $JENKINS_TMP_DIR"
+          echo "👤 Running as user: $(whoami)"
+          echo "📁 Checking if temp directory is accessible:"
+          ls -ld $JENKINS_TMP_DIR || echo "❌ Temp directory not found!"
+        '''
+      }
+    }
+
     stage('Checkout') {
       steps {
         echo "✅ Checking out code from GitHub repo..."
@@ -31,7 +42,7 @@ pipeline {
           sh '''
             cd java-maven-sonar-argocd-helm-k8s/spring-boot-app
             mvn sonar:sonar \
-              -Dsonar.token=$SONAR_AUTH_TOKEN \
+              -Dsonar.login=$SONAR_AUTH_TOKEN \
               -Dsonar.host.url=${SONAR_URL}
           '''
         }
@@ -58,7 +69,8 @@ pipeline {
     }
 
     stage('Update Deployment File') {
-      agent any  // ✅ fixes “process never started” issue by avoiding @tmp workspaces
+      // ✅ Run this directly on Jenkins node
+      agent { label 'built-in' }
 
       environment {
         GIT_REPO_NAME = "Jenkins-Zero-To-Hero"
@@ -70,21 +82,13 @@ pipeline {
           script {
             echo "🚀 Updating deployment manifest with new Docker image tag..."
 
-            // ✅ uses real bash shell and safe workspace
-            sh label: 'Update Deployment Manifest', returnStatus: false, script: '''
-              #!/usr/bin/bash
-              set -euxo pipefail
-
-              echo "🧭 Current workspace: $(pwd)"
-              ls -ltr
-
-              git clone https://github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git
-              cd ${GIT_REPO_NAME}/java-maven-sonar-argocd-helm-k8s
+            sh '''
+              cd java-maven-sonar-argocd-helm-k8s
 
               git config user.email "stark.devops@example.com"
               git config user.name "Rajesh Goruvaa"
 
-              echo "🔄 Updating deployment image tag..."
+              BUILD_NUMBER=${BUILD_NUMBER}
               sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" spring-boot-app-manifests/deployment.yml
 
               echo "🧾 Updated deployment file image:"
@@ -92,7 +96,6 @@ pipeline {
 
               git add spring-boot-app-manifests/deployment.yml
               git commit -m "Update deployment image to version ${BUILD_NUMBER}" || echo "No changes to commit"
-
               git pull --rebase origin main
               git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git HEAD:main
             '''
