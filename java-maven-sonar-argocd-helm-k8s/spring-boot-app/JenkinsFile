@@ -57,39 +57,41 @@ pipeline {
       }
     }
 
-    // ✅ Updated manifest handling stage
-    stage('Update Deployment File') {
-      agent any   // run this stage directly on Jenkins host
-      environment {
-        GIT_REPO_NAME = "Jenkins-Zero-To-Hero"
-        GIT_USER_NAME = "RajeshGoruvaa"
-      }
-      steps {
-        withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
-          sh '''
-            echo "🚀 Updating deployment manifest with new Docker image tag..."
+stage('Update Deployment File') {
+  // ✅ Run this directly on Jenkins node, not inside a container
+  agent { label 'master' }
 
-            cd java-maven-sonar-argocd-helm-k8s
-            git config user.email "stark.devops@example.com"
-            git config user.name "Rajesh Goruvaa"
+  environment {
+    GIT_REPO_NAME = "Jenkins-Zero-To-Hero"
+    GIT_USER_NAME = "RajeshGoruvaa"
+  }
 
-            BUILD_NUMBER=${BUILD_NUMBER}
-            sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" spring-boot-app-manifests/deployment.yml
+  steps {
+    withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
+      script {
+        echo "🚀 Updating deployment manifest with new Docker image tag..."
 
-            echo "🧾 deployment.yml after update:"
-            grep image spring-boot-app-manifests/deployment.yml || true
+        sh '''
+          cd java-maven-sonar-argocd-helm-k8s
 
-            git add spring-boot-app-manifests/deployment.yml
-            git commit -m "Update deployment image to version ${BUILD_NUMBER}" || echo "No changes to commit"
-            git pull --rebase origin main
-            git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git HEAD:main
+          git config user.email "stark.devops@example.com"
+          git config user.name "Rajesh Goruvaa"
 
-            echo "✅ Manifest updated and pushed successfully."
-          '''
-        }
+          BUILD_NUMBER=${BUILD_NUMBER}
+          sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" spring-boot-app-manifests/deployment.yml
+
+          echo "🧾 Updated deployment file image:"
+          grep image spring-boot-app-manifests/deployment.yml || true
+
+          git add spring-boot-app-manifests/deployment.yml
+          git commit -m "Update deployment image to version ${BUILD_NUMBER}" || echo "No changes to commit"
+          git pull --rebase origin main
+          git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git HEAD:main
+        '''
       }
     }
-  } // <-- closes 'stages'
+  }
+}
 
   post {
     always {
