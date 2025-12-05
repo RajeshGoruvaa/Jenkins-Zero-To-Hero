@@ -1,7 +1,7 @@
 pipeline {
   agent {
     docker {
-      image 'maven:3.9.9-eclipse-temurin-17'
+      image 'rajeshgoruvaa/maven-docker-jdk17:v1'
       args '-v /var/run/docker.sock:/var/run/docker.sock'
     }
   }
@@ -31,7 +31,7 @@ pipeline {
     }
     stage('Build and Push Docker Image') {
       environment {
-        DOCKER_IMAGE = "rajeshgoruvaa/ultimate-cicd:${BUILD_NUMBER}"
+        DOCKER_IMAGE = "rajeshgoruvaa/maven-docker-jdk17:${BUILD_NUMBER}"
         // DOCKERFILE_LOCATION = "java-maven-sonar-argocd-helm-k8s/spring-boot-app/Dockerfile"
         REGISTRY_CREDENTIALS = credentials('docker-cred')
       }
